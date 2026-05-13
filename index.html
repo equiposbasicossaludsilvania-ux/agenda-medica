@@ -247,31 +247,62 @@ const DIAS = [
   {d:"2026-06-19",lbl:"Vie",num:"19",mes:"junio"},
   {d:"2026-06-26",lbl:"Vie",num:"26",mes:"junio"},
 ];
+
 function pad(n){return String(n).padStart(2,"0")}
+
 function genSlots(){
   const s=[];
   for(let h=7;h<12;h++) for(let m=0;m<60;m+=DUR) s.push({t:pad(h)+":"+pad(m),turno:"man"});
   for(let h=13;h<17;h++) for(let m=0;m<60;m+=DUR) s.push({t:pad(h)+":"+pad(m),turno:"tar"});
-  return s.filter(sl=>{const[hh,mm]=sl.t.split(":").map(Number);return new Date(2000,0,1,hh,mm+DUR)<=new Date(2000,0,1,17,0);});
+  return s.filter(sl=>{
+    const[hh,mm]=sl.t.split(":").map(Number);
+    return new Date(2000,0,1,hh,mm+DUR)<=new Date(2000,0,1,17,0);
+  });
 }
 const SLOTS=genSlots();
 let ocupadas={},selDay=null,selSlot=null;
 
-function apiUrl(params){return API+"?"+new URLSearchParams(params).toString();}
+// JSONP: inyecta un <script> con ?callback=fn y espera la respuesta
+function jsonp(params){
+  return new Promise((resolve,reject)=>{
+    const cbName="__cb"+Date.now()+"_"+Math.floor(Math.random()*9999);
+    const script=document.createElement("script");
+    const p={...params,callback:cbName};
+    const url=API+"?"+new URLSearchParams(p).toString();
 
-async function llamarAPI(params){
-  const url=apiUrl(params);
-  const r=await fetch(url,{method:"GET",redirect:"follow"});
-  const txt=await r.text();
-  const m=txt.match(/\{[\s\S]*\}/);
-  return JSON.parse(m?m[0]:txt);
+    window[cbName]=function(data){
+      delete window[cbName];
+      document.head.removeChild(script);
+      resolve(data);
+    };
+
+    script.src=url;
+    script.onerror=function(){
+      delete window[cbName];
+      try{document.head.removeChild(script);}catch(e){}
+      reject(new Error("Error de red al conectar con el servidor."));
+    };
+
+    setTimeout(function(){
+      if(window[cbName]){
+        delete window[cbName];
+        try{document.head.removeChild(script);}catch(e){}
+        reject(new Error("El servidor tardó demasiado. Intente de nuevo."));
+      }
+    },15000);
+
+    document.head.appendChild(script);
+  });
 }
 
 async function cargarOcupadas(){
   try{
-    const j=await llamarAPI({action:"getOcupadas"});
+    const j=await jsonp({action:"getOcupadas"});
     if(j&&j.ok) ocupadas=j.ocupadas||{};
-  }catch(e){ocupadas={};}
+  }catch(e){
+    console.warn("No se pudo cargar disponibilidad:",e.message);
+    ocupadas={};
+  }
   document.getElementById("init-ldg").style.display="none";
   document.getElementById("dias-wrap").style.display="block";
   document.getElementById("msg-carga").textContent="Selecciona una fecha disponible:";
@@ -279,8 +310,17 @@ async function cargarOcupadas(){
 }
 
 function libres(f){return SLOTS.filter(s=>!ocupadas[f+"_"+s.t]).length;}
-function fmtFecha(f){const[y,m,d]=f.split("-");const ms=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];return `${+d} de ${ms[+m-1]} de ${y}`;}
-function fmtFin(h){const[hh,mm]=h.split(":").map(Number);const fin=new Date(2000,0,1,hh,mm+DUR);return pad(fin.getHours())+":"+pad(fin.getMinutes());}
+
+function fmtFecha(f){
+  const[y,m,d]=f.split("-");
+  const ms=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return `${+d} de ${ms[+m-1]} de ${y}`;
+}
+function fmtFin(h){
+  const[hh,mm]=h.split(":").map(Number);
+  const fin=new Date(2000,0,1,hh,mm+DUR);
+  return pad(fin.getHours())+":"+pad(fin.getMinutes());
+}
 
 function renderDays(){
   const g=document.getElementById("days-grid");g.innerHTML="";
@@ -293,6 +333,7 @@ function renderDays(){
     g.appendChild(c);
   });
 }
+
 function renderSlots(){
   ["man","tar"].forEach(turno=>{
     const g=document.getElementById("sg-"+turno);g.innerHTML="";
@@ -306,9 +347,15 @@ function renderSlots(){
     });
   });
 }
-function goStep2(){if(!selDay||!selSlot)return;document.getElementById("sib-txt").textContent=fmtFecha(selDay)+" · "+selSlot+" – "+fmtFin(selSlot);showStep(2);}
+
+function goStep2(){
+  if(!selDay||!selSlot)return;
+  document.getElementById("sib-txt").textContent=fmtFecha(selDay)+" · "+selSlot+" – "+fmtFin(selSlot);
+  showStep(2);
+}
 function goStep1(){showStep(1);}
 function v(id){return document.getElementById(id).value.trim();}
+
 function goStep3(){
   const req=[["f-canal","Nombre del canalizador"],["f-id","ID del canalizador"],["f-lugar","Lugar / sede"],["f-n1","Primer nombre"],["f-a1","Primer apellido"],["f-tdoc","Tipo de documento"],["f-ndoc","Número de documento"],["f-tel","Teléfono"],["f-reg","Régimen de salud"],["f-eps","EPS"]];
   const falta=req.filter(([id])=>!v(id));
@@ -320,31 +367,56 @@ function goStep3(){
   document.getElementById("sum-pac").innerHTML=[["Paciente",pac],["Documento",v("f-tdoc")+" "+v("f-ndoc")],["Teléfono",v("f-tel")],["Régimen",v("f-reg")],["EPS",v("f-eps")]].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
   showStep(3);
 }
+
 async function confirmar(){
-  const btn=document.getElementById("btn-conf"),ldg=document.getElementById("ldg"),serr=document.getElementById("serr");
-  btn.disabled=true;document.getElementById("btn-edit").style.display="none";
-  ldg.style.display="flex";serr.style.display="none";
-  const params={action:"agendar",fecha:selDay,hora:selSlot,canalizador:v("f-canal"),id_canal:v("f-id"),lugar:v("f-lugar"),nom1:v("f-n1"),nom2:v("f-n2"),ape1:v("f-a1"),ape2:v("f-a2"),tipo_doc:v("f-tdoc"),num_doc:v("f-ndoc"),tel:v("f-tel"),regimen:v("f-reg"),eps:v("f-eps")};
+  const btn=document.getElementById("btn-conf");
+  const ldg=document.getElementById("ldg");
+  const serr=document.getElementById("serr");
+  btn.disabled=true;
+  document.getElementById("btn-edit").style.display="none";
+  ldg.style.display="flex";
+  serr.style.display="none";
+
+  const params={
+    action:"agendar",
+    fecha:selDay, hora:selSlot,
+    canalizador:v("f-canal"), id_canal:v("f-id"), lugar:v("f-lugar"),
+    nom1:v("f-n1"), nom2:v("f-n2"), ape1:v("f-a1"), ape2:v("f-a2"),
+    tipo_doc:v("f-tdoc"), num_doc:v("f-ndoc"), tel:v("f-tel"),
+    regimen:v("f-reg"), eps:v("f-eps")
+  };
+
   try{
-    const j=await llamarAPI(params);
+    const j=await jsonp(params);
     ldg.style.display="none";
     if(j&&j.ok){
       ocupadas[selDay+"_"+selSlot]=true;
       const pac=[v("f-n1"),v("f-n2"),v("f-a1"),v("f-a2")].filter(Boolean).join(" ");
       document.getElementById("conf-sub").textContent=fmtFecha(selDay)+" · "+selSlot+" – "+fmtFin(selSlot);
       document.getElementById("conf-id").textContent="CIT-"+Date.now().toString().slice(-6);
-      document.getElementById("conf-card").innerHTML=[["Paciente",pac],["Documento",v("f-tdoc")+" "+v("f-ndoc")],["EPS",v("f-eps")+" · "+v("f-reg")],["Canalizador",v("f-canal")+" ("+v("f-id")+")"],["Sede",v("f-lugar")]].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
+      document.getElementById("conf-card").innerHTML=[
+        ["Paciente",pac],
+        ["Documento",v("f-tdoc")+" "+v("f-ndoc")],
+        ["EPS",v("f-eps")+" · "+v("f-reg")],
+        ["Canalizador",v("f-canal")+" ("+v("f-id")+")"],
+        ["Sede",v("f-lugar")]
+      ].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
       showStep(4);
     }else{
-      serr.style.display="block";serr.textContent=(j&&j.msg)||"Error al guardar. Intente de nuevo.";
-      btn.disabled=false;document.getElementById("btn-edit").style.display="block";
+      serr.style.display="block";
+      serr.textContent=(j&&j.msg)||"Error al guardar. Intente de nuevo.";
+      btn.disabled=false;
+      document.getElementById("btn-edit").style.display="block";
     }
   }catch(e){
     ldg.style.display="none";
-    serr.style.display="block";serr.textContent="Error de conexión. Verifique su internet e intente de nuevo.";
-    btn.disabled=false;document.getElementById("btn-edit").style.display="block";
+    serr.style.display="block";
+    serr.textContent=e.message||"Error de conexión. Intente de nuevo.";
+    btn.disabled=false;
+    document.getElementById("btn-edit").style.display="block";
   }
 }
+
 function nueva(){
   selDay=null;selSlot=null;
   ["f-canal","f-id","f-lugar","f-n1","f-n2","f-a1","f-a2","f-ndoc","f-tel"].forEach(id=>document.getElementById(id).value="");
@@ -353,10 +425,15 @@ function nueva(){
   document.getElementById("btn-n1").style.display="none";
   cargarOcupadas();showStep(1);
 }
+
 function showStep(n){
   [1,2,3,4].forEach(i=>document.getElementById("step"+i).classList.toggle("active",i===n));
-  [1,2,3].forEach(i=>{document.getElementById("pb"+i).className="pb"+(i<n?" done":i===n?" act":"");document.getElementById("pl"+i).className="pl"+(i===n?" act":"");});
+  [1,2,3].forEach(i=>{
+    document.getElementById("pb"+i).className="pb"+(i<n?" done":i===n?" act":"");
+    document.getElementById("pl"+i).className="pl"+(i===n?" act":"");
+  });
 }
+
 cargarOcupadas();
 </script>
 </body>
