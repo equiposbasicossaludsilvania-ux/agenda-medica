@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Agendamiento Médico</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1A6FBF;
+  --blue-light:#E8F2FC;
+  --blue-mid:#85B7EB;
+  --green:#2D7D46;
+  --green-light:#E6F4EC;
+  --red:#B92C2C;
+  --red-light:#FCEAEA;
+  --amber:#A05C0A;
+  --amber-light:#FEF3E2;
+  --gray-50:#F7F7F6;
+  --gray-100:#EEEDE9;
+  --gray-200:#D8D6D0;
+  --gray-400:#9A9890;
+  --gray-600:#5C5B56;
+  --gray-900:#1C1C1A;
+  --border:1px solid #E2E0D8;
+  --radius:10px;
+  --radius-lg:16px;
+  --shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 16px rgba(0,0,0,0.06);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--gray-50);color:var(--gray-900);min-height:100vh;padding:2rem 1rem}
+.page{max-width:600px;margin:0 auto}
+
+/* Header */
+.header{text-align:center;margin-bottom:2rem}
+.header-badge{display:inline-flex;align-items:center;gap:6px;background:#fff;border:var(--border);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--gray-600);margin-bottom:1rem}
+.header h1{font-size:24px;font-weight:600;color:var(--gray-900);margin-bottom:4px}
+.header p{font-size:14px;color:var(--gray-600)}
+
+/* Card */
+.card{background:#fff;border:var(--border);border-radius:var(--radius-lg);padding:1.75rem;box-shadow:var(--shadow);margin-bottom:1rem}
+
+/* Progress */
+.prog-wrap{margin-bottom:1.75rem}
+.prog-bar{display:flex;gap:5px}
+.pb{flex:1;height:3px;border-radius:2px;background:var(--gray-100);transition:background .3s}
+.pb.done{background:var(--blue)}
+.pb.act{background:var(--blue-mid)}
+.prog-labels{display:flex;justify-content:space-between;margin-top:6px}
+.pl{font-size:11px;color:var(--gray-400);font-weight:500}
+.pl.act{color:var(--blue)}
+
+/* Steps */
+.step{display:none}.step.active{display:block}
+.step-title{font-size:16px;font-weight:600;color:var(--gray-900);margin-bottom:3px}
+.step-sub{font-size:13px;color:var(--gray-400);margin-bottom:1.25rem}
+
+/* Days */
+.days-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem}
+@media(min-width:480px){.days-grid{grid-template-columns:repeat(6,1fr)}}
+.dc{border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 6px;cursor:pointer;text-align:center;background:#fff;transition:border-color .15s,background .15s}
+.dc:hover{border-color:var(--blue-mid);background:var(--blue-light)}
+.dc.sel{border:2px solid var(--blue);background:var(--blue-light)}
+.dc.full{opacity:.4;cursor:not-allowed;background:var(--gray-50)}
+.dn{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.dd{font-size:18px;font-weight:600;color:var(--gray-900);margin:3px 0}
+.dm{font-size:10px;color:var(--gray-400)}
+.dc.sel .dn,.dc.sel .dd,.dc.sel .dm{color:var(--blue)}
+.av-badge{font-size:10px;margin-top:5px;padding:2px 6px;border-radius:20px;display:inline-block;font-weight:500}
+.av-ok{background:var(--green-light);color:var(--green)}
+.av-few{background:var(--amber-light);color:var(--amber)}
+.av-no{background:var(--red-light);color:var(--red)}
+
+/* Turno separador */
+.turno-sep{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-400);margin:1rem 0 .6rem;display:flex;align-items:center;gap:8px}
+.turno-sep::after{content:'';flex:1;height:1px;background:var(--gray-100)}
+
+/* Slots */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:6px;margin-bottom:.5rem}
+.sl{border:1px solid var(--gray-200);border-radius:var(--radius);padding:8px 4px;text-align:center;cursor:pointer;font-size:12px;font-weight:500;background:#fff;color:var(--gray-900);transition:border-color .15s,background .15s;font-family:'DM Mono',monospace}
+.sl:hover{border-color:var(--blue-mid);background:var(--blue-light)}
+.sl.sel{border:2px solid var(--blue);background:var(--blue-light);color:var(--blue)}
+.sl.taken{opacity:.35;cursor:not-allowed;text-decoration:line-through;background:var(--gray-50)}
+
+/* Slot seleccionado info */
+.slot-info{background:var(--blue-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:1.25rem;font-size:13px;color:var(--blue);font-weight:500;display:flex;align-items:center;gap:8px}
+
+/* Formulario */
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fr.one{grid-template-columns:1fr}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:12px;font-weight:500;color:var(--gray-600)}
+.fg input,.fg select{font-size:13px;border-radius:var(--radius);border:1px solid var(--gray-200);padding:9px 11px;background:#fff;color:var(--gray-900);width:100%;font-family:'DM Sans',sans-serif;transition:border-color .15s}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,111,191,.1)}
+.fg input::placeholder{color:var(--gray-400)}
+.sdiv{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-400);margin:.9rem 0 .6rem;display:flex;align-items:center;gap:8px}
+.sdiv::after{content:'';flex:1;height:1px;background:var(--gray-100)}
+
+/* Botones */
+.btn-row{display:flex;gap:8px;margin-top:1.25rem}
+.btn{padding:10px 20px;border-radius:var(--radius);border:1px solid var(--gray-200);font-size:13px;cursor:pointer;font-weight:600;background:#fff;color:var(--gray-900);font-family:'DM Sans',sans-serif;transition:background .15s}
+.btn:hover{background:var(--gray-50)}
+.btnp{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btnp:hover{background:#155fa8;border-color:#155fa8}
+.btnp:disabled{opacity:.5;cursor:not-allowed}
+
+/* Summary */
+.sc{background:var(--gray-50);border:1px solid var(--gray-100);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:.75rem}
+.sc-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400);margin-bottom:.6rem}
+.sr{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid var(--gray-100)}
+.sr:last-child{border-bottom:none}
+.sr span:first-child{color:var(--gray-600)}
+.sr span:last-child{font-weight:600;color:var(--gray-900)}
+
+/* Error / loading */
+.err{display:none;background:var(--red-light);color:var(--red);border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-top:.9rem;font-weight:500}
+.loading{display:none;align-items:center;gap:8px;font-size:13px;color:var(--gray-600);padding:10px 0}
+.spinner{width:16px;height:16px;border:2px solid var(--gray-200);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Confirmación */
+.cok{text-align:center;padding:1.5rem 0 1rem}
+.cico{width:56px;height:56px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.cico svg{width:26px;height:26px;stroke:var(--green);stroke-width:2.5;fill:none}
+.cid-num{display:inline-block;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;margin-top:6px;font-family:'DM Mono',monospace}
+
+/* Cargando inicial */
+.init-loading{text-align:center;padding:2rem;color:var(--gray-400);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:12px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Medicina General
+    </div>
+    <h1>Agendamiento médico</h1>
+    <p>Consultas de 20 min · Lunes a viernes · 7:00–12:00 y 13:00–17:00</p>
+  </div>
+
+  <div class="card">
+    <div class="prog-wrap">
+      <div class="prog-bar">
+        <div class="pb act" id="pb1"></div>
+        <div class="pb" id="pb2"></div>
+        <div class="pb" id="pb3"></div>
+      </div>
+      <div class="prog-labels">
+        <span class="pl act" id="pl1">Fecha y hora</span>
+        <span class="pl" id="pl2" style="text-align:center">Datos</span>
+        <span class="pl" id="pl3" style="text-align:right">Confirmación</span>
+      </div>
+    </div>
+
+    <!-- PASO 1 -->
+    <div class="step active" id="step1">
+      <p class="step-title">Selecciona una fecha</p>
+      <p class="step-sub" id="msg-carga">Consultando disponibilidad...</p>
+      <div class="init-loading" id="init-ldg">
+        <div class="spinner"></div>
+        Cargando disponibilidad...
+      </div>
+      <div id="dias-wrap" style="display:none">
+        <div class="days-grid" id="days-grid"></div>
+        <div id="slots-sec" style="display:none">
+          <p class="step-title" style="margin-top:.5rem">Horarios disponibles</p>
+          <div class="turno-sep">Mañana &nbsp;7:00 – 12:00</div>
+          <div class="sg" id="sg-man"></div>
+          <div class="turno-sep">Tarde &nbsp;13:00 – 17:00</div>
+          <div class="sg" id="sg-tar"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btnp" id="btn-n1" onclick="goStep2()" style="display:none">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 2 -->
+    <div class="step" id="step2">
+      <p class="step-title">Datos de canalización</p>
+      <p class="step-sub">Complete todos los campos marcados con *</p>
+      <div class="slot-info" id="sib">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span id="sib-txt"></span>
+      </div>
+
+      <div class="sdiv">Canalizador</div>
+      <div class="fr">
+        <div class="fg"><label>Nombre completo *</label><input type="text" id="f-canal" placeholder="Nombre del canalizador"/></div>
+        <div class="fg"><label>ID / código *</label><input type="text" id="f-id" placeholder="Ej. CAN-0042"/></div>
+      </div>
+      <div class="fr one">
+        <div class="fg"><label>Lugar / sede de origen *</label><input type="text" id="f-lugar" placeholder="Ej. Puesto de salud Silvania"/></div>
+      </div>
+
+      <div class="sdiv">Paciente</div>
+      <div class="fr">
+        <div class="fg"><label>Primer nombre *</label><input type="text" id="f-n1"/></div>
+        <div class="fg"><label>Segundo nombre</label><input type="text" id="f-n2"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Primer apellido *</label><input type="text" id="f-a1"/></div>
+        <div class="fg"><label>Segundo apellido</label><input type="text" id="f-a2"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Tipo de documento *</label>
+          <select id="f-tdoc">
+            <option value="">Seleccione...</option>
+            <option>Cédula de ciudadanía</option>
+            <option>Cédula de extranjería</option>
+            <option>Tarjeta de identidad</option>
+            <option>Pasaporte</option>
+            <option>NUIP</option>
+            <option>Registro civil</option>
+          </select>
+        </div>
+        <div class="fg"><label>Número de documento *</label><input type="text" id="f-ndoc"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Teléfono / celular *</label><input type="tel" id="f-tel" placeholder="3XX XXX XXXX"/></div>
+        <div class="fg"><label>Régimen de salud *</label>
+          <select id="f-reg">
+            <option value="">Seleccione...</option>
+            <option>Contributivo</option>
+            <option>Subsidiado</option>
+            <option>Especial / excepción</option>
+            <option>No asegurado</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr one">
+        <div class="fg"><label>EPS *</label>
+          <select id="f-eps">
+            <option value="">Seleccione...</option>
+            <option>Sura EPS</option><option>Nueva EPS</option><option>Sanitas</option>
+            <option>Compensar</option><option>Famisanar</option><option>Salud Total</option>
+            <option>Coosalud</option><option>Mutual Ser</option><option>Cajacopi</option>
+            <option>Medimás</option><option>SAVIA Salud</option><option>Otra EPS</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="err" id="ferr"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="goStep1()">← Volver</button>
+        <button class="btn btnp" onclick="goStep3()">Revisar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 3 -->
+    <div class="step" id="step3">
+      <p class="step-title">Confirmar cita</p>
+      <p class="step-sub">Verifique los datos. Al confirmar, la franja quedará bloqueada.</p>
+      <div class="sc"><div class="sc-title">Cita</div><div id="sum-cita"></div></div>
+      <div class="sc"><div class="sc-title">Paciente</div><div id="sum-pac"></div></div>
+      <div class="loading" id="ldg"><div class="spinner"></div> Guardando en Google Sheets...</div>
+      <div class="err" id="serr"></div>
+      <div class="btn-row">
+        <button class="btn" id="btn-edit" onclick="goStep2()">← Editar</button>
+        <button class="btn btnp" id="btn-conf" onclick="confirmar()">✓ Confirmar cita</button>
+      </div>
+    </div>
+
+    <!-- PASO 4 -->
+    <div class="step" id="step4">
+      <div class="cok">
+        <div class="cico">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <p style="font-size:18px;font-weight:600;margin-bottom:5px">¡Cita agendada!</p>
+        <p style="font-size:13px;color:#5C5B56" id="conf-sub"></p>
+        <span class="cid-num" id="conf-id"></span>
+      </div>
+      <div class="sc"><div class="sc-title">Resumen</div><div id="conf-card"></div></div>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn btnp" onclick="nueva()">Agendar otra cita</button>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="text-align:center;font-size:11px;color:#9A9890;margin-top:1rem">Los datos son guardados de forma segura en Google Sheets</p>
+</div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbyZym4Fd06YZ2NWYgLXYnq5K0JsjekgLmFKMd1A-7-uhx24jWnh3Is8AJrOQHzhQMms/exec";
+const DUR = 20;
+
+const DIAS = [
+  {d:"2026-05-22",lbl:"Vie",num:"22",mes:"mayo"},
+  {d:"2026-05-29",lbl:"Vie",num:"29",mes:"mayo"},
+  {d:"2026-06-05",lbl:"Vie",num:"5",mes:"junio"},
+  {d:"2026-06-12",lbl:"Vie",num:"12",mes:"junio"},
+  {d:"2026-06-19",lbl:"Vie",num:"19",mes:"junio"},
+  {d:"2026-06-26",lbl:"Vie",num:"26",mes:"junio"},
+];
+
+function genSlots(){
+  const s=[];
+  for(let h=7;h<12;h++) for(let m=0;m<60;m+=DUR) s.push({t:pad(h)+":"+pad(m),turno:"man"});
+  for(let h=13;h<17;h++) for(let m=0;m<60;m+=DUR) s.push({t:pad(h)+":"+pad(m),turno:"tar"});
+  return s.filter(sl=>{
+    const[hh,mm]=sl.t.split(":").map(Number);
+    return new Date(2000,0,1,hh,mm+DUR)<=new Date(2000,0,1,17,0);
+  });
+}
+function pad(n){return String(n).padStart(2,"0")}
+const SLOTS=genSlots();
+
+let ocupadas={};
+let selDay=null,selSlot=null;
+
+async function cargarOcupadas(){
+  try{
+    const r=await fetch(API+"?action=getOcupadas");
+    const j=await r.json();
+    if(j.ok) ocupadas=j.ocupadas||{};
+  }catch(e){ocupadas={};}
+  document.getElementById("init-ldg").style.display="none";
+  document.getElementById("dias-wrap").style.display="block";
+  document.getElementById("msg-carga").textContent="Selecciona una fecha disponible:";
+  renderDays();
+}
+
+function libres(fecha){return SLOTS.filter(s=>!ocupadas[fecha+"_"+s.t]).length;}
+
+function fmtFecha(f){
+  const[y,m,d]=f.split("-");
+  const ms=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return `${+d} de ${ms[+m-1]} de ${y}`;
+}
+function fmtFin(h){
+  const[hh,mm]=h.split(":").map(Number);
+  const fin=new Date(2000,0,1,hh,mm+DUR);
+  return pad(fin.getHours())+":"+pad(fin.getMinutes());
+}
+
+function renderDays(){
+  const g=document.getElementById("days-grid");g.innerHTML="";
+  DIAS.forEach(dia=>{
+    const l=libres(dia.d);
+    const full=l===0,few=l>0&&l<=4;
+    const c=document.createElement("div");
+    c.className="dc"+(full?" full":"")+(selDay===dia.d?" sel":"");
+    c.innerHTML=`<div class="dn">${dia.lbl}</div><div class="dd">${dia.num}</div><div class="dm">${dia.mes}</div><div class="av-badge ${full?"av-no":few?"av-few":"av-ok"}">${full?"Sin cupos":l+" libre"+(l!==1?"s":"")}</div>`;
+    if(!full) c.onclick=()=>{selDay=dia.d;selSlot=null;renderDays();renderSlots();document.getElementById("slots-sec").style.display="block";document.getElementById("btn-n1").style.display="none";};
+    g.appendChild(c);
+  });
+}
+
+function renderSlots(){
+  ["man","tar"].forEach(turno=>{
+    const g=document.getElementById("sg-"+turno);g.innerHTML="";
+    SLOTS.filter(s=>s.turno===turno).forEach(s=>{
+      const tomado=!!ocupadas[selDay+"_"+s.t];
+      const el=document.createElement("div");
+      el.className="sl"+(tomado?" taken":"")+(selSlot===s.t?" sel":"");
+      el.textContent=s.t+"–"+fmtFin(s.t);
+      if(!tomado) el.onclick=()=>{selSlot=s.t;renderSlots();document.getElementById("btn-n1").style.display="block";};
+      g.appendChild(el);
+    });
+  });
+}
+
+function goStep2(){
+  if(!selDay||!selSlot)return;
+  document.getElementById("sib-txt").textContent=fmtFecha(selDay)+" · "+selSlot+" – "+fmtFin(selSlot);
+  showStep(2);
+}
+function goStep1(){showStep(1);}
+
+function v(id){return document.getElementById(id).value.trim();}
+
+function goStep3(){
+  const req=[["f-canal","Nombre del canalizador"],["f-id","ID del canalizador"],["f-lugar","Lugar / sede"],["f-n1","Primer nombre"],["f-a1","Primer apellido"],["f-tdoc","Tipo de documento"],["f-ndoc","Número de documento"],["f-tel","Teléfono"],["f-reg","Régimen de salud"],["f-eps","EPS"]];
+  const falta=req.filter(([id])=>!v(id));
+  const err=document.getElementById("ferr");
+  if(falta.length){err.style.display="block";err.textContent="Faltan campos: "+falta.map(f=>f[1]).join(", ");return;}
+  err.style.display="none";
+  const pac=[v("f-n1"),v("f-n2"),v("f-a1"),v("f-a2")].filter(Boolean).join(" ");
+  document.getElementById("sum-cita").innerHTML=[["Fecha",fmtFecha(selDay)],["Hora",selSlot+" – "+fmtFin(selSlot)],["Duración",DUR+" min"],["Canalizador",v("f-canal")],["ID canalizador",v("f-id")],["Sede",v("f-lugar")]].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
+  document.getElementById("sum-pac").innerHTML=[["Paciente",pac],["Documento",v("f-tdoc")+" "+v("f-ndoc")],["Teléfono",v("f-tel")],["Régimen",v("f-reg")],["EPS",v("f-eps")]].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
+  showStep(3);
+}
+
+async function confirmar(){
+  const btn=document.getElementById("btn-conf");
+  const ldg=document.getElementById("ldg");
+  const serr=document.getElementById("serr");
+  btn.disabled=true;document.getElementById("btn-edit").style.display="none";
+  ldg.style.display="flex";serr.style.display="none";
+
+  const params=new URLSearchParams({
+    action:"agendar",
+    fecha:selDay,hora:selSlot,
+    canalizador:v("f-canal"),id_canal:v("f-id"),lugar:v("f-lugar"),
+    nom1:v("f-n1"),nom2:v("f-n2"),ape1:v("f-a1"),ape2:v("f-a2"),
+    tipo_doc:v("f-tdoc"),num_doc:v("f-ndoc"),tel:v("f-tel"),
+    regimen:v("f-reg"),eps:v("f-eps")
+  });
+
+  try{
+    const r=await fetch(API+"?"+params.toString());
+    const j=await r.json();
+    ldg.style.display="none";
+    if(j.ok){
+      ocupadas[selDay+"_"+selSlot]=true;
+      const pac=[v("f-n1"),v("f-n2"),v("f-a1"),v("f-a2")].filter(Boolean).join(" ");
+      const cid="CIT-"+Date.now().toString().slice(-6);
+      document.getElementById("conf-sub").textContent=fmtFecha(selDay)+" · "+selSlot+" – "+fmtFin(selSlot);
+      document.getElementById("conf-id").textContent=cid;
+      document.getElementById("conf-card").innerHTML=[["Paciente",pac],["Documento",v("f-tdoc")+" "+v("f-ndoc")],["EPS",v("f-eps")+" · "+v("f-reg")],["Canalizador",v("f-canal")+" ("+v("f-id")+")"],["Sede",v("f-lugar")]].map(([k,val])=>`<div class="sr"><span>${k}</span><span>${val}</span></div>`).join("");
+      showStep(4);
+    }else{
+      serr.style.display="block";
+      serr.textContent=j.msg||"Error al guardar. Intente de nuevo.";
+      btn.disabled=false;document.getElementById("btn-edit").style.display="block";
+    }
+  }catch(e){
+    ldg.style.display="none";
+    serr.style.display="block";
+    serr.textContent="Error de conexión. Verifique su internet e intente de nuevo.";
+    btn.disabled=false;document.getElementById("btn-edit").style.display="block";
+  }
+}
+
+function nueva(){
+  selDay=null;selSlot=null;
+  ["f-canal","f-id","f-lugar","f-n1","f-n2","f-a1","f-a2","f-ndoc","f-tel"].forEach(id=>document.getElementById(id).value="");
+  ["f-tdoc","f-reg","f-eps"].forEach(id=>document.getElementById(id).selectedIndex=0);
+  document.getElementById("slots-sec").style.display="none";
+  document.getElementById("btn-n1").style.display="none";
+  cargarOcupadas();showStep(1);
+}
+
+function showStep(n){
+  [1,2,3,4].forEach(i=>document.getElementById("step"+i).classList.toggle("active",i===n));
+  [1,2,3].forEach(i=>{
+    document.getElementById("pb"+i).className="pb"+(i<n?" done":i===n?" act":"");
+    const pl=document.getElementById("pl"+i);
+    pl.className="pl"+(i===n?" act":"");
+  });
+}
+
+cargarOcupadas();
+</script>
+</body>
+</html>
